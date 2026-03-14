@@ -10,7 +10,7 @@ const bcrypt = require("bcrypt");
 
 const app = express();
 let isConnected = false;
-module.exports = app; 
+module.exports = app;
 
 app.use(
   cors({
@@ -29,7 +29,7 @@ function generateTrackingId() {
   return `${prefix}-${date}-${random}`;
 }
 
-// MongoDB URI (kept compatible with your previous setup)
+// MongoDB URI 
 const uri = `mongodb+srv://${process.env.MONGO_URI}:${process.env.DB_PASS}@cluster0.ulrflcx.mongodb.net/?retryWrites=true&w=majority`;
 
 const client = new MongoClient(uri, {
@@ -41,7 +41,6 @@ const client = new MongoClient(uri, {
 });
 
 async function run() {
-  // Connect and define routes only once
   await client.connect();
   const db = client.db("city_resolve_db");
 
@@ -73,6 +72,10 @@ async function run() {
       const dbUser = await users.findOne({ email: decoded.email });
       if (!dbUser) {
         return res.status(403).send({ message: "User not found in DB" });
+      }
+
+      if (dbUser.isBlocked) {
+        return res.status(403).send({ message: "Account blocked" });
       }
 
       req.email = dbUser.email;
@@ -195,6 +198,13 @@ async function run() {
       console.error("login error:", err);
       res.status(500).send({ message: "Server error" });
     }
+  });
+
+  // logged user info
+  app.get("/me", verifyToken, async (req, res) => {
+    const user = await users.findOne({ email: req.email });
+    const { password, ...safeUser } = user;
+    res.send(safeUser);
   });
 
   // Create or upsert user
@@ -438,7 +448,7 @@ async function run() {
           staffNid,
           isPremium: false,
           isBlocked: false,
-          password: hashed, 
+          password: hashed,
           createdAt: new Date(),
         };
 
@@ -566,12 +576,10 @@ async function run() {
               },
             },
           );
-          return res
-            .status(403)
-            .send({
-              code: "FREE_LIMIT_REACHED",
-              reason: "Free users can report only 3 issues",
-            });
+          return res.status(403).send({
+            code: "FREE_LIMIT_REACHED",
+            reason: "Free users can report only 3 issues",
+          });
         }
       }
 
